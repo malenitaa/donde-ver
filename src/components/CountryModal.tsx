@@ -18,10 +18,8 @@ export default function CountryModal({ currentCountry, onSave, onClose }: Props)
       <div className="w-full max-w-md rounded-2xl bg-neutral-900 p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-50">País de tus cuentas</h2>
-            <p className="mt-1 text-sm text-neutral-400">
-              El país donde están registradas tus cuentas de streaming, no tu ubicación actual.
-            </p>
+            <h2 className="text-lg font-semibold text-neutral-50">País del catálogo</h2>
+            <p className="mt-1 text-sm text-neutral-400">No se detecta por ubicación — elegilo vos.</p>
           </div>
           <button
             type="button"

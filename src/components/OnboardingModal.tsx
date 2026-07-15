@@ -29,12 +29,9 @@ export default function OnboardingModal({ onSave }: Props) {
         </p>
 
         <div className="mt-5">
-          <label className="mb-1.5 block text-sm font-medium text-neutral-200">País de tus cuentas</label>
+          <label className="mb-1.5 block text-sm font-medium text-neutral-200">País del catálogo</label>
           <CountrySelect value={country.code} onChange={setCountry} />
-          <p className="mt-1.5 text-xs text-neutral-500">
-            Es el país donde está registrada tu cuenta de cada app (ej. Netflix Argentina), no tu
-            ubicación actual. Lo podés cambiar cuando quieras.
-          </p>
+          <p className="mt-1.5 text-xs text-neutral-500">No se detecta por ubicación — elegilo vos.</p>
         </div>
 
         <div className="mt-5">
