@@ -39,6 +39,12 @@ TMDB y JustWatch identifican cada servicio de streaming con IDs distintos (TMDB 
 
 Next.js (App Router) + TypeScript + Tailwind CSS. Sin backend propio más allá de route handlers (`src/app/api/*`) que llaman a TMDB y JustWatch server-side para no exponer la API key en el cliente. Sin base de datos: plataformas elegidas y watchlist viven en `localStorage`. Los resultados de búsqueda se cachean en memoria por sesión (se pierden al recargar) para no repetir pedidos mientras se tipea.
 
+### Arquitectura: el cliente nunca le pega a TMDB/JustWatch directo
+
+El navegador solo hace `fetch` a rutas propias (`/api/search`, `/api/discover`, `/api/providers`, `/api/regions`, `/api/leaving-soon`) — same-origin, mismo dominio que la app. Esas rutas son [Route Handlers de Next.js](https://nextjs.org/docs/app/building-your-application/routing/route-handlers), que corren server-side (funciones serverless en Vercel), y son las únicas que salen a internet a pedirle datos a TMDB o al endpoint no oficial de JustWatch.
+
+Esto es automático por cómo está organizado el código, no una convención a mantener a mano: `src/lib/tmdb.ts` y `src/lib/justwatch.ts` (donde vive la API key y la lógica de los pedidos) solo los importan archivos bajo `src/app/api/*/route.ts`. Next.js nunca incluye ese código en el bundle que baja al navegador, porque los componentes de cliente (`page.tsx`, `PlatformPicker.tsx`, etc.) no lo importan — solo llaman a `fetch("/api/...")`. Se puede verificar abriendo las DevTools → Network en la app corriendo: no debería aparecer ningún request a `api.themoviedb.org` ni a `apis.justwatch.com`, solo al propio dominio.
+
 ## Cómo correrlo local
 
 1. Cloná el repo e instalá dependencias:
