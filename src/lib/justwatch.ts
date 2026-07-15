@@ -175,5 +175,6 @@ export async function getLeavingSoon(justWatchProviderIds: string[], country: st
     });
   }
 
+  titles.sort((a, b) => new Date(a.leavingAt!).getTime() - new Date(b.leavingAt!).getTime());
   return titles;
 }
