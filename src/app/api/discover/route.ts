@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { discoverTitles } from "@/lib/tmdb";
+import { parseLocale } from "@/lib/i18n";
 import type { MediaType } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
     .filter(Boolean)
     .map(Number);
   const country = params.get("country");
+  const locale = parseLocale(params.get("locale"));
   const type = (params.get("type") as MediaType | "all") ?? "all";
   const genreName = params.get("genre") ?? undefined;
   const maxRuntimeParam = params.get("maxRuntime");
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
     const mediaTypes: MediaType[] = type === "all" ? ["movie", "tv"] : [type];
     const results = (
       await Promise.all(
-        mediaTypes.map((mediaType) => discoverTitles({ mediaType, region: country, providerIds, genreName, maxRuntime }))
+        mediaTypes.map((mediaType) => discoverTitles({ mediaType, region: country, locale, providerIds, genreName, maxRuntime }))
       )
     ).flat();
 

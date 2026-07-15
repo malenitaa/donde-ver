@@ -9,12 +9,14 @@ import EmptyState from "@/components/EmptyState";
 import PlatformsModal from "@/components/PlatformsModal";
 import OnboardingModal from "@/components/OnboardingModal";
 import CountryModal from "@/components/CountryModal";
+import { useLocale } from "@/components/LocaleProvider";
 import { useCountry, usePlatforms, useWatchlist } from "@/lib/storage";
 import type { Title } from "@/lib/types";
 
 const DEFAULT_FILTERS: Filters = { type: "all", genre: null, maxRuntime: null, leavingSoon: false };
 
 export default function Home() {
+  const { locale, t } = useLocale();
   const { platforms, setPlatforms, loaded: platformsLoaded } = usePlatforms();
   const { country, setCountry, loaded: countryLoaded } = useCountry();
   const { isInWatchlist, toggle } = useWatchlist();
@@ -39,7 +41,7 @@ export default function Home() {
     if (!platformsLoaded || !countryLoaded || !platforms || platforms.length === 0 || !countryCode) return;
 
     const mode = filters.leavingSoon ? "leaving" : query ? "search" : "discover";
-    const cacheKey = JSON.stringify({ mode, query, filters, providerIds, justWatchIds, countryCode });
+    const cacheKey = JSON.stringify({ mode, query, filters, providerIds, justWatchIds, countryCode, locale });
     const cached = cache.current.get(cacheKey);
     if (cached) {
       setResults(cached);
@@ -55,20 +57,21 @@ export default function Home() {
         let data: Title[];
         if (mode === "leaving") {
           const res = await fetch(
-            `/api/leaving-soon?providers=${justWatchIds.join(",")}&country=${countryCode}`,
+            `/api/leaving-soon?providers=${justWatchIds.join(",")}&country=${countryCode}&locale=${locale}`,
             { signal: controller.signal }
           );
           if (!res.ok) throw new Error("leaving-soon failed");
           data = (await res.json()).results;
           if (query) data = data.filter((t) => t.title.toLowerCase().includes(query.toLowerCase()));
         } else if (mode === "search") {
-          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&country=${countryCode}`, {
-            signal: controller.signal,
-          });
+          const res = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}&country=${countryCode}&locale=${locale}`,
+            { signal: controller.signal }
+          );
           if (!res.ok) throw new Error("search failed");
           data = (await res.json()).results;
         } else {
-          const params = new URLSearchParams({ providers: providerIds.join(","), country: countryCode });
+          const params = new URLSearchParams({ providers: providerIds.join(","), country: countryCode, locale });
           if (filters.type !== "all") params.set("type", filters.type);
           if (filters.genre) params.set("genre", filters.genre);
           if (filters.maxRuntime) params.set("maxRuntime", String(filters.maxRuntime));
@@ -98,7 +101,7 @@ export default function Home() {
 
     run();
     return () => controller.abort();
-  }, [query, filters, platforms, platformsLoaded, countryLoaded, countryCode, providerIds, justWatchIds]);
+  }, [query, filters, platforms, platformsLoaded, countryLoaded, countryCode, providerIds, justWatchIds, locale]);
 
   if (!platformsLoaded || !countryLoaded) return null;
 
@@ -125,19 +128,14 @@ export default function Home() {
         </div>
         <FiltersBar filters={filters} onChange={setFilters} />
 
-        {status === "loading" && <p className="py-10 text-center text-sm text-neutral-500">Buscando…</p>}
+        {status === "loading" && <p className="py-10 text-center text-sm text-neutral-500">{t.loading}</p>}
 
-        {status === "error" && (
-          <EmptyState
-            title="No pudimos conectar con el servicio"
-            description="TMDB o JustWatch no respondieron. Probá de nuevo en unos segundos."
-          />
-        )}
+        {status === "error" && <EmptyState title={t.errorTitle} description={t.errorDescription} />}
 
         {status === "ready" && results.length === 0 && (
           <EmptyState
-            title={filters.leavingSoon ? "Nada por irse de tus plataformas por ahora" : "Sin resultados"}
-            description={query ? `No encontramos "${query}".` : "Probá ajustar los filtros."}
+            title={filters.leavingSoon ? t.noResultsLeaving : t.noResultsGeneric}
+            description={query ? t.noResultsQuery(query) : t.tryAdjustFilters}
           />
         )}
 
@@ -152,10 +150,7 @@ export default function Home() {
 
         {status === "ready" && showUnmatched && (
           <>
-            <EmptyState
-              title={`"${query}" no está disponible en tus apps`}
-              description="Pero lo encontramos en otras plataformas:"
-            />
+            <EmptyState title={t.notInYourApps(query)} description={t.availableElsewhere} />
             <div className="mt-4">
               <ResultsGrid
                 titles={results}

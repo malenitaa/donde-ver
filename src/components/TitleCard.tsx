@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { Provider, Title } from "@/lib/types";
 import { posterUrl } from "@/lib/images";
+import { useLocale } from "./LocaleProvider";
 
 type Props = {
   title: Title;
@@ -19,6 +20,7 @@ function formatRuntime(minutes: number | null): string | null {
 }
 
 export default function TitleCard({ title, userProviders, inWatchlist, onToggleWatchlist }: Props) {
+  const { locale, t } = useLocale();
   const poster = posterUrl(title.posterPath);
   const userProviderIds = new Set(userProviders.map((p) => p.id));
   const matchingOffers = title.offers.filter(
@@ -47,7 +49,7 @@ export default function TitleCard({ title, userProviders, inWatchlist, onToggleW
         <button
           type="button"
           onClick={() => onToggleWatchlist(title)}
-          aria-label={inWatchlist ? "Quitar de mi lista" : "Agregar a mi lista"}
+          aria-label={inWatchlist ? t.removeFromWatchlist : t.addToWatchlist}
           className={`absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-lg backdrop-blur ${
             inWatchlist ? "bg-emerald-500 text-neutral-950" : "bg-neutral-950/70 text-neutral-100"
           }`}
@@ -56,7 +58,12 @@ export default function TitleCard({ title, userProviders, inWatchlist, onToggleW
         </button>
         {title.leavingAt && (
           <span className="absolute left-2 top-2 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-neutral-950">
-            Se va {new Date(title.leavingAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+            {t.leavingAtBadge(
+              new Date(title.leavingAt).toLocaleDateString(locale === "en" ? "en-US" : "es-AR", {
+                day: "numeric",
+                month: "short",
+              })
+            )}
           </span>
         )}
       </div>
@@ -64,14 +71,12 @@ export default function TitleCard({ title, userProviders, inWatchlist, onToggleW
       <div className="flex flex-1 flex-col gap-1 p-2.5">
         <h3 className="line-clamp-2 text-sm font-medium text-neutral-50">{title.title}</h3>
         <p className="text-xs text-neutral-400">
-          {[title.year, title.mediaType === "tv" ? "Serie" : "Película", formatRuntime(title.runtime)]
+          {[title.year, title.mediaType === "tv" ? t.mediaTypeTv : t.mediaTypeMovie, formatRuntime(title.runtime)]
             .filter(Boolean)
             .join(" · ")}
         </p>
 
-        {!availableInUserApps && (
-          <p className="mt-1 text-[11px] text-amber-400">No está en tus apps. Disponible en:</p>
-        )}
+        {!availableInUserApps && <p className="mt-1 text-[11px] text-amber-400">{t.notInYourAppsCard}</p>}
 
         {uniqueProviders.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
@@ -87,9 +92,7 @@ export default function TitleCard({ title, userProviders, inWatchlist, onToggleW
             ))}
           </div>
         )}
-        {offersToShow.length === 0 && (
-          <p className="mt-1 text-[11px] text-neutral-500">Sin oferta de streaming en Argentina.</p>
-        )}
+        {offersToShow.length === 0 && <p className="mt-1 text-[11px] text-neutral-500">{t.noStreamingOffer}</p>}
       </div>
     </div>
   );

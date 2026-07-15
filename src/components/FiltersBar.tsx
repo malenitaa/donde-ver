@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { GENRE_OPTIONS, RUNTIME_OPTIONS } from "@/lib/constants";
+import { GENRE_OPTIONS, RUNTIME_OPTIONS } from "@/lib/i18n";
+import { useLocale } from "./LocaleProvider";
 import type { MediaType } from "@/lib/types";
 
 export type Filters = {
@@ -16,14 +17,15 @@ type Props = {
   onChange: (filters: Filters) => void;
 };
 
-const TYPE_OPTIONS: { label: string; value: Filters["type"] }[] = [
-  { label: "Todo", value: "all" },
-  { label: "Películas", value: "movie" },
-  { label: "Series", value: "tv" },
-];
-
 export default function FiltersBar({ filters, onChange }: Props) {
+  const { locale, t } = useLocale();
   const [open, setOpen] = useState(false);
+
+  const typeOptions: { label: string; value: Filters["type"] }[] = [
+    { label: t.typeAll, value: "all" },
+    { label: t.typeMovie, value: "movie" },
+    { label: t.typeTv, value: "tv" },
+  ];
 
   const activeCount = [filters.genre, filters.maxRuntime, filters.leavingSoon || null].filter(Boolean).length;
 
@@ -34,12 +36,12 @@ export default function FiltersBar({ filters, onChange }: Props) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-lg border border-neutral-800 px-3 py-2 text-sm text-neutral-200 sm:hidden"
       >
-        Filtros {activeCount > 0 && `(${activeCount})`}
+        {t.filters} {activeCount > 0 && `(${activeCount})`}
       </button>
 
       <div className={`${open ? "flex" : "hidden"} mt-3 flex-col gap-3 sm:mt-0 sm:flex sm:flex-row sm:flex-wrap sm:items-center`}>
         <div className="flex gap-1.5">
-          {TYPE_OPTIONS.map((opt) => (
+          {typeOptions.map((opt) => (
             <button
               key={opt.value}
               type="button"
@@ -60,8 +62,8 @@ export default function FiltersBar({ filters, onChange }: Props) {
           onChange={(e) => onChange({ ...filters, genre: e.target.value || null })}
           className="rounded-full bg-neutral-900 px-3 py-1.5 text-xs text-neutral-200"
         >
-          <option value="">Cualquier género</option>
-          {GENRE_OPTIONS.map((g) => (
+          <option value="">{t.anyGenre}</option>
+          {GENRE_OPTIONS[locale].map((g) => (
             <option key={g} value={g}>
               {g}
             </option>
@@ -73,8 +75,8 @@ export default function FiltersBar({ filters, onChange }: Props) {
           onChange={(e) => onChange({ ...filters, maxRuntime: e.target.value ? Number(e.target.value) : null })}
           className="rounded-full bg-neutral-900 px-3 py-1.5 text-xs text-neutral-200"
         >
-          <option value="">Cualquier duración</option>
-          {RUNTIME_OPTIONS.map((r) => (
+          <option value="">{t.anyRuntime}</option>
+          {RUNTIME_OPTIONS[locale].map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
             </option>
@@ -90,7 +92,7 @@ export default function FiltersBar({ filters, onChange }: Props) {
               : "bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
           }`}
         >
-          Por irse del catálogo
+          {t.leavingSoonFilter}
         </button>
       </div>
     </div>

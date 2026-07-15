@@ -1,3 +1,4 @@
+import { JUSTWATCH_LANGUAGE, type Locale } from "./i18n";
 import type { MediaType, Title } from "./types";
 
 /**
@@ -7,7 +8,6 @@ import type { MediaType, Title } from "./types";
  */
 const JUSTWATCH_API = "https://apis.justwatch.com/graphql";
 const IMAGES_BASE = "https://images.justwatch.com";
-const LANGUAGE = "es";
 const LEAVING_SOON_WINDOW_DAYS = 30;
 // Max items JustWatch will return per page for this query before erroring with
 // "page too large" — found by trial, not documented anywhere.
@@ -85,7 +85,7 @@ async function postGraphQL<T>(operationName: string, query: string, variables: R
   return json.data as T;
 }
 
-async function fetchPopularPage(providerId: string, country: string, offset: number): Promise<JwNode[]> {
+async function fetchPopularPage(providerId: string, country: string, locale: Locale, offset: number): Promise<JwNode[]> {
   const data = await postGraphQL<{ popularTitles: { edges: { node: JwNode }[] } }>(
     "GetPopularTitles",
     POPULAR_QUERY,
@@ -101,7 +101,7 @@ async function fetchPopularPage(providerId: string, country: string, offset: num
         includeTitlesWithoutUrl: true,
       },
       country,
-      language: LANGUAGE,
+      language: JUSTWATCH_LANGUAGE[locale],
       first: PAGE_SIZE,
       offset,
       filter: { bestOnly: true },
@@ -121,11 +121,11 @@ async function fetchPopularPage(providerId: string, country: string, offset: num
  * quietly leaves a catalog — can still be missed. There's no dedicated "leaving
  * soon" endpoint on this unofficial API to fall back on.
  */
-export async function getLeavingSoon(justWatchProviderIds: string[], country: string): Promise<Title[]> {
+export async function getLeavingSoon(justWatchProviderIds: string[], country: string, locale: Locale): Promise<Title[]> {
   if (justWatchProviderIds.length === 0) return [];
 
   const pageRequests = justWatchProviderIds.flatMap((providerId) =>
-    Array.from({ length: PAGES_PER_PROVIDER }, (_, i) => fetchPopularPage(providerId, country, i * PAGE_SIZE))
+    Array.from({ length: PAGES_PER_PROVIDER }, (_, i) => fetchPopularPage(providerId, country, locale, i * PAGE_SIZE))
   );
   const pages = await Promise.all(pageRequests);
 

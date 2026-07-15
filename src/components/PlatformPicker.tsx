@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { Provider } from "@/lib/types";
 import { logoUrl } from "@/lib/images";
+import { useLocale } from "./LocaleProvider";
 
 type Props = {
   country: string;
@@ -12,7 +13,8 @@ type Props = {
   saveLabel?: string;
 };
 
-export default function PlatformPicker({ country, initialSelected, onSave, saveLabel = "Guardar" }: Props) {
+export default function PlatformPicker({ country, initialSelected, onSave, saveLabel }: Props) {
+  const { locale, t } = useLocale();
   const [available, setAvailable] = useState<Provider[] | null>(null);
   const [error, setError] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
@@ -24,14 +26,14 @@ export default function PlatformPicker({ country, initialSelected, onSave, saveL
     // previous country's provider list as if it were still valid.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAvailable(null);
-    fetch(`/api/providers?country=${country}`)
+    fetch(`/api/providers?country=${country}&locale=${locale}`)
       .then((res) => {
         if (!res.ok) throw new Error("bad response");
         return res.json();
       })
       .then((data) => setAvailable(data.providers))
       .catch(() => setError(true));
-  }, [country]);
+  }, [country, locale]);
 
   const toggle = (id: number) => {
     setSelectedIds((prev) => {
@@ -43,15 +45,11 @@ export default function PlatformPicker({ country, initialSelected, onSave, saveL
   };
 
   if (error) {
-    return (
-      <p className="text-sm text-red-400">
-        No pudimos cargar la lista de plataformas. Revisá tu conexión o intentá de nuevo más tarde.
-      </p>
-    );
+    return <p className="text-sm text-red-400">{t.providersError}</p>;
   }
 
   if (!available) {
-    return <p className="text-sm text-neutral-400">Cargando plataformas…</p>;
+    return <p className="text-sm text-neutral-400">{t.loadingProviders}</p>;
   }
 
   return (
@@ -84,11 +82,9 @@ export default function PlatformPicker({ country, initialSelected, onSave, saveL
         disabled={selectedIds.size === 0}
         className="mt-6 w-full rounded-lg bg-emerald-500 py-3 font-medium text-neutral-950 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {saveLabel}
+        {saveLabel ?? t.save}
       </button>
-      {selectedIds.size === 0 && (
-        <p className="mt-2 text-center text-xs text-neutral-500">Elegí al menos una plataforma para continuar.</p>
-      )}
+      {selectedIds.size === 0 && <p className="mt-2 text-center text-xs text-neutral-500">{t.pickAtLeastOne}</p>}
     </div>
   );
 }

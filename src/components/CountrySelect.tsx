@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Country } from "@/lib/types";
+import { useLocale } from "./LocaleProvider";
 
 type Props = {
   value: string;
@@ -15,21 +16,22 @@ type Props = {
  * registered, not their physical location.
  */
 export default function CountrySelect({ value, onChange }: Props) {
+  const { locale, t } = useLocale();
   const [countries, setCountries] = useState<Country[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch("/api/regions")
+    fetch(`/api/regions?locale=${locale}`)
       .then((res) => {
         if (!res.ok) throw new Error("bad response");
         return res.json();
       })
       .then((data) => setCountries(data.regions))
       .catch(() => setError(true));
-  }, []);
+  }, [locale]);
 
   if (error) {
-    return <p className="text-sm text-red-400">No pudimos cargar la lista de países.</p>;
+    return <p className="text-sm text-red-400">{t.countriesError}</p>;
   }
 
   return (
@@ -49,7 +51,7 @@ export default function CountrySelect({ value, onChange }: Props) {
           </option>
         ))
       ) : (
-        <option>Cargando países…</option>
+        <option>{t.loadingCountries}</option>
       )}
     </select>
   );

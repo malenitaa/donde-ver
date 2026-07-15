@@ -1,12 +1,8 @@
+import { TMDB_LANGUAGE, type Locale } from "./i18n";
 import { findJustWatchId } from "./providers";
 import type { Country, Genre, MediaType, Provider, Title, TitleOffer } from "./types";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
-// Language for titles/overviews shown in the UI. Deliberately not tied to the
-// catalog country: the catalog country reflects where the user's streaming
-// accounts are registered, while the app's copy and content language stay
-// Spanish (Argentina) regardless of which country's catalog is being queried.
-const LANGUAGE = "es-AR";
 
 function apiKey(): string {
   const key = process.env.TMDB_API_KEY;
@@ -14,10 +10,10 @@ function apiKey(): string {
   return key;
 }
 
-async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+async function tmdbFetch<T>(path: string, language: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(TMDB_BASE + path);
   url.searchParams.set("api_key", apiKey());
-  url.searchParams.set("language", LANGUAGE);
+  url.searchParams.set("language", language);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
   const res = await fetch(url.toString(), { next: { revalidate: 60 * 60 } });
@@ -28,10 +24,10 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
 }
 
 /** All countries TMDB has watch-provider coverage for, used for the country picker. */
-export async function getRegions(): Promise<Country[]> {
+export async function getRegions(locale: Locale): Promise<Country[]> {
   const data = await tmdbFetch<{ results: { iso_3166_1: string; english_name: string; native_name: string }[] }>(
     "/watch/providers/regions",
-    { language: "es" }
+    TMDB_LANGUAGE[locale]
   );
   return data.results
     .map((r) => ({ code: r.iso_3166_1, name: r.native_name || r.english_name }))
@@ -53,14 +49,17 @@ type TmdbProvidersResponse = {
 };
 
 /** Full list of curated watch providers (movie + tv) for the given catalog country, for onboarding. */
-export async function getCuratedProviders(region: string): Promise<Provider[]> {
+export async function getCuratedProviders(region: string, locale: Locale): Promise<Provider[]> {
+  const language = TMDB_LANGUAGE[locale];
   const [moviesList, tvList] = await Promise.all([
     tmdbFetch<{ results: { provider_id: number; provider_name: string; logo_path: string }[] }>(
       "/watch/providers/movie",
+      language,
       { watch_region: region }
     ),
     tmdbFetch<{ results: { provider_id: number; provider_name: string; logo_path: string }[] }>(
       "/watch/providers/tv",
+      language,
       { watch_region: region }
     ),
   ]);
@@ -81,16 +80,20 @@ export async function getCuratedProviders(region: string): Promise<Provider[]> {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-let genreCache: { movie: Genre[]; tv: Genre[] } | null = null;
+// Genre names are locale-specific text, so the cache is keyed by locale.
+const genreCache: Partial<Record<Locale, { movie: Genre[]; tv: Genre[] }>> = {};
 
-async function getGenres(): Promise<{ movie: Genre[]; tv: Genre[] }> {
-  if (genreCache) return genreCache;
+async function getGenres(locale: Locale): Promise<{ movie: Genre[]; tv: Genre[] }> {
+  const cached = genreCache[locale];
+  if (cached) return cached;
+  const language = TMDB_LANGUAGE[locale];
   const [movie, tv] = await Promise.all([
-    tmdbFetch<{ genres: Genre[] }>("/genre/movie/list"),
-    tmdbFetch<{ genres: Genre[] }>("/genre/tv/list"),
+    tmdbFetch<{ genres: Genre[] }>("/genre/movie/list", language),
+    tmdbFetch<{ genres: Genre[] }>("/genre/tv/list", language),
   ]);
-  genreCache = { movie: movie.genres, tv: tv.genres };
-  return genreCache;
+  const result = { movie: movie.genres, tv: tv.genres };
+  genreCache[locale] = result;
+  return result;
 }
 
 type RegionResult = TmdbProvidersResponse["results"][string];
@@ -114,11 +117,12 @@ function offersFromProvidersResponse(regionResult: RegionResult | undefined): Ti
   return offers;
 }
 
-async function enrichWithDetails(mediaType: MediaType, id: number, region: string): Promise<Title | null> {
+async function enrichWithDetails(mediaType: MediaType, id: number, region: string, locale: Locale): Promise<Title | null> {
   try {
+    const language = TMDB_LANGUAGE[locale];
     const [details, providers] = await Promise.all([
-      tmdbFetch<Record<string, unknown>>(`/${mediaType}/${id}`),
-      tmdbFetch<TmdbProvidersResponse>(`/${mediaType}/${id}/watch/providers`),
+      tmdbFetch<Record<string, unknown>>(`/${mediaType}/${id}`, language),
+      tmdbFetch<TmdbProvidersResponse>(`/${mediaType}/${id}/watch/providers`, language),
     ]);
 
     const title = mediaType === "movie" ? (details.title as string) : (details.name as string);
@@ -145,28 +149,29 @@ async function enrichWithDetails(mediaType: MediaType, id: number, region: strin
   }
 }
 
-export async function searchTitles(query: string, region: string, limit = 20): Promise<Title[]> {
+export async function searchTitles(query: string, region: string, locale: Locale, limit = 20): Promise<Title[]> {
   const search = await tmdbFetch<{
     results: { id: number; media_type: string }[];
-  }>("/search/multi", { query, include_adult: "false" });
+  }>("/search/multi", TMDB_LANGUAGE[locale], { query, include_adult: "false" });
 
   const candidates = search.results
     .filter((r) => r.media_type === "movie" || r.media_type === "tv")
     .slice(0, limit) as { id: number; media_type: MediaType }[];
 
-  const enriched = await Promise.all(candidates.map((c) => enrichWithDetails(c.media_type, c.id, region)));
+  const enriched = await Promise.all(candidates.map((c) => enrichWithDetails(c.media_type, c.id, region, locale)));
   return enriched.filter((t): t is Title => t !== null);
 }
 
 export async function discoverTitles(opts: {
   mediaType: MediaType;
   region: string;
+  locale: Locale;
   providerIds: number[];
   genreName?: string;
   maxRuntime?: number;
   page?: number;
 }): Promise<Title[]> {
-  const { movie, tv } = await getGenres();
+  const { movie, tv } = await getGenres(opts.locale);
   const genreList = opts.mediaType === "movie" ? movie : tv;
   const genreId = opts.genreName ? genreList.find((g) => g.name.toLowerCase() === opts.genreName!.toLowerCase())?.id : undefined;
 
@@ -184,11 +189,13 @@ export async function discoverTitles(opts: {
   const pagesToFetch = opts.maxRuntime ? [startPage, startPage + 1] : [startPage];
 
   const pages = await Promise.all(
-    pagesToFetch.map((page) => tmdbFetch<{ results: { id: number }[] }>(path, { ...baseParams, page: String(page) }))
+    pagesToFetch.map((page) =>
+      tmdbFetch<{ results: { id: number }[] }>(path, TMDB_LANGUAGE[opts.locale], { ...baseParams, page: String(page) })
+    )
   );
   const candidateIds = pages.flatMap((p) => p.results).map((r) => r.id);
 
-  const enriched = await Promise.all(candidateIds.map((id) => enrichWithDetails(opts.mediaType, id, opts.region)));
+  const enriched = await Promise.all(candidateIds.map((id) => enrichWithDetails(opts.mediaType, id, opts.region, opts.locale)));
   let results = enriched.filter((t): t is Title => t !== null);
   if (opts.maxRuntime) {
     results = results.filter((t) => t.runtime !== null && t.runtime <= opts.maxRuntime!);
@@ -196,6 +203,6 @@ export async function discoverTitles(opts: {
   return results.slice(0, 20);
 }
 
-export async function getTitleDetails(mediaType: MediaType, id: number, region: string): Promise<Title | null> {
-  return enrichWithDetails(mediaType, id, region);
+export async function getTitleDetails(mediaType: MediaType, id: number, region: string, locale: Locale): Promise<Title | null> {
+  return enrichWithDetails(mediaType, id, region, locale);
 }

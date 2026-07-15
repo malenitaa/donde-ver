@@ -7,9 +7,11 @@ import EmptyState from "@/components/EmptyState";
 import PlatformsModal from "@/components/PlatformsModal";
 import OnboardingModal from "@/components/OnboardingModal";
 import CountryModal from "@/components/CountryModal";
+import { useLocale } from "@/components/LocaleProvider";
 import { useCountry, usePlatforms, useWatchlist } from "@/lib/storage";
 
 export default function WatchlistPage() {
+  const { t } = useLocale();
   const { platforms, setPlatforms, loaded: platformsLoaded } = usePlatforms();
   const { country, setCountry, loaded: countryLoaded } = useCountry();
   const { watchlist, isInWatchlist, toggle, loaded: watchlistLoaded } = useWatchlist();
@@ -33,13 +35,10 @@ export default function WatchlistPage() {
     <>
       <Header onEditPlatforms={() => setEditingPlatforms(true)} onEditCountry={() => setEditingCountry(true)} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        <h1 className="mb-4 text-xl font-semibold">Mi lista</h1>
+        <h1 className="mb-4 text-xl font-semibold">{t.watchlistTitle}</h1>
 
         {watchlist.length === 0 ? (
-          <EmptyState
-            title="Todavía no agregaste nada"
-            description='Buscá algo y tocá el "+" en el poster para guardarlo acá.'
-          />
+          <EmptyState title={t.watchlistEmptyTitle} description={t.watchlistEmptyDescription} />
         ) : (
           <ResultsGrid
             titles={watchlist}
