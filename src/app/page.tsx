@@ -7,16 +7,20 @@ import FiltersBar, { type Filters } from "@/components/FiltersBar";
 import ResultsGrid from "@/components/ResultsGrid";
 import EmptyState from "@/components/EmptyState";
 import PlatformsModal from "@/components/PlatformsModal";
-import { usePlatforms, useWatchlist } from "@/lib/storage";
+import OnboardingModal from "@/components/OnboardingModal";
+import CountryModal from "@/components/CountryModal";
+import { useCountry, usePlatforms, useWatchlist } from "@/lib/storage";
 import type { Title } from "@/lib/types";
 
 const DEFAULT_FILTERS: Filters = { type: "all", genre: null, maxRuntime: null, leavingSoon: false };
 
 export default function Home() {
   const { platforms, setPlatforms, loaded: platformsLoaded } = usePlatforms();
+  const { country, setCountry, loaded: countryLoaded } = useCountry();
   const { isInWatchlist, toggle } = useWatchlist();
 
   const [editingPlatforms, setEditingPlatforms] = useState(false);
+  const [editingCountry, setEditingCountry] = useState(false);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<Title[]>([]);
@@ -29,12 +33,13 @@ export default function Home() {
     () => (platforms ?? []).map((p) => p.justWatchId).filter((id): id is string => !!id),
     [platforms]
   );
+  const countryCode = country?.code;
 
   useEffect(() => {
-    if (!platformsLoaded || !platforms || platforms.length === 0) return;
+    if (!platformsLoaded || !countryLoaded || !platforms || platforms.length === 0 || !countryCode) return;
 
     const mode = filters.leavingSoon ? "leaving" : query ? "search" : "discover";
-    const cacheKey = JSON.stringify({ mode, query, filters, providerIds, justWatchIds });
+    const cacheKey = JSON.stringify({ mode, query, filters, providerIds, justWatchIds, countryCode });
     const cached = cache.current.get(cacheKey);
     if (cached) {
       setResults(cached);
@@ -49,18 +54,21 @@ export default function Home() {
       try {
         let data: Title[];
         if (mode === "leaving") {
-          const res = await fetch(`/api/leaving-soon?providers=${justWatchIds.join(",")}`, {
-            signal: controller.signal,
-          });
+          const res = await fetch(
+            `/api/leaving-soon?providers=${justWatchIds.join(",")}&country=${countryCode}`,
+            { signal: controller.signal }
+          );
           if (!res.ok) throw new Error("leaving-soon failed");
           data = (await res.json()).results;
           if (query) data = data.filter((t) => t.title.toLowerCase().includes(query.toLowerCase()));
         } else if (mode === "search") {
-          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&country=${countryCode}`, {
+            signal: controller.signal,
+          });
           if (!res.ok) throw new Error("search failed");
           data = (await res.json()).results;
         } else {
-          const params = new URLSearchParams({ providers: providerIds.join(",") });
+          const params = new URLSearchParams({ providers: providerIds.join(","), country: countryCode });
           if (filters.type !== "all") params.set("type", filters.type);
           if (filters.genre) params.set("genre", filters.genre);
           if (filters.maxRuntime) params.set("maxRuntime", String(filters.maxRuntime));
@@ -90,16 +98,17 @@ export default function Home() {
 
     run();
     return () => controller.abort();
-  }, [query, filters, platforms, platformsLoaded, providerIds, justWatchIds]);
+  }, [query, filters, platforms, platformsLoaded, countryLoaded, countryCode, providerIds, justWatchIds]);
 
-  if (!platformsLoaded) return null;
+  if (!platformsLoaded || !countryLoaded) return null;
 
-  if (!platforms || platforms.length === 0) {
+  if (!platforms || platforms.length === 0 || !country) {
     return (
-      <PlatformsModal
-        currentSelection={platforms ?? []}
-        onSave={(selected) => setPlatforms(selected)}
-        dismissible={false}
+      <OnboardingModal
+        onSave={(selectedCountry, selectedPlatforms) => {
+          setCountry(selectedCountry);
+          setPlatforms(selectedPlatforms);
+        }}
       />
     );
   }
@@ -109,7 +118,7 @@ export default function Home() {
 
   return (
     <>
-      <Header onEditPlatforms={() => setEditingPlatforms(true)} />
+      <Header onEditPlatforms={() => setEditingPlatforms(true)} onEditCountry={() => setEditingCountry(true)} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         <div className="mb-4">
           <SearchBar onQueryChange={setQuery} />
@@ -161,12 +170,24 @@ export default function Home() {
 
       {editingPlatforms && (
         <PlatformsModal
+          country={country.code}
           currentSelection={platforms}
           onSave={(selected) => {
             setPlatforms(selected);
             setEditingPlatforms(false);
           }}
           onClose={() => setEditingPlatforms(false)}
+        />
+      )}
+
+      {editingCountry && (
+        <CountryModal
+          currentCountry={country}
+          onSave={(selected) => {
+            setCountry(selected);
+            setEditingCountry(false);
+          }}
+          onClose={() => setEditingCountry(false)}
         />
       )}
     </>

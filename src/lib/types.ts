@@ -1,5 +1,11 @@
 export type MediaType = "movie" | "tv";
 
+export type Country = {
+  /** ISO 3166-1 alpha-2 code, e.g. "AR" */
+  code: string;
+  name: string;
+};
+
 export type Provider = {
   /** TMDB watch-provider id */
   id: number;

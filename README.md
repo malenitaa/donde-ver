@@ -4,11 +4,13 @@ Web app para buscar películas y series y ver al instante en cuál de *tus* plat
 
 ## Qué hace
 
-1. La primera vez que entrás elegís qué plataformas tenés (Netflix, HBO Max, Disney+, Prime Video, Paramount+, Apple TV, MUBI, Claro video, MovistarTV, Crunchyroll). Se guarda en `localStorage`. Podés editarlo después con el botón "Mis apps" en el header.
-2. Todo lo que ves —catálogo por defecto y resultados de búsqueda— se filtra automáticamente a esas plataformas.
+1. La primera vez que entrás elegís, en el mismo paso, el país de tus cuentas de streaming (default Argentina, editable) y qué plataformas tenés ahí (Netflix, HBO Max, Disney+, Prime Video, Paramount+, Apple TV, MUBI, Claro video, MovistarTV, Crunchyroll). Se guarda en `localStorage`. Podés editar cada uno por separado después con los botones "País" y "Mis apps" en el header.
+2. Todo lo que ves —catálogo por defecto y resultados de búsqueda— se filtra automáticamente a esas plataformas, en el país elegido.
 3. Buscador con debounce: tipeás un título y ves en cuál de tus apps está. Si no está en ninguna, te avisa y te muestra en qué otras plataformas sí está disponible.
 4. Filtros por tipo (película/serie), género, duración (ej. menos de 90 min) y **por irse del catálogo pronto**.
 5. Watchlist personal ("Mi lista"), guardada también en `localStorage`.
+
+**Por qué el país es una elección manual y no se autodetecta por IP:** el catálogo que importa es el de la *cuenta* de streaming (ej. Netflix Argentina), no la ubicación física del momento — alguien de Argentina viajando por USA sigue viendo el catálogo argentino en sus apps, no el de USA. Autodetectar por IP/geolocalización mostraría falsos positivos de disponibilidad. Por eso el país nunca se infiere: se pide explícitamente en el onboarding y se puede cambiar en cualquier momento con el botón "País" del header.
 
 ## Fuentes de datos
 

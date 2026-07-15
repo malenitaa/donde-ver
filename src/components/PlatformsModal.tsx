@@ -4,13 +4,14 @@ import PlatformPicker from "./PlatformPicker";
 import type { Provider } from "@/lib/types";
 
 type Props = {
+  country: string;
   currentSelection: Provider[];
   onSave: (selected: Provider[]) => void;
   onClose?: () => void;
   dismissible?: boolean;
 };
 
-export default function PlatformsModal({ currentSelection, onSave, onClose, dismissible = true }: Props) {
+export default function PlatformsModal({ country, currentSelection, onSave, onClose, dismissible = true }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-950/90 px-4 py-10 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-2xl bg-neutral-900 p-6 shadow-xl">
@@ -32,7 +33,7 @@ export default function PlatformsModal({ currentSelection, onSave, onClose, dism
             </button>
           )}
         </div>
-        <PlatformPicker initialSelected={currentSelection} onSave={onSave} />
+        <PlatformPicker country={country} initialSelected={currentSelection} onSave={onSave} />
       </div>
     </div>
   );

@@ -7,7 +7,6 @@ import type { MediaType, Title } from "./types";
  */
 const JUSTWATCH_API = "https://apis.justwatch.com/graphql";
 const IMAGES_BASE = "https://images.justwatch.com";
-const COUNTRY = "AR";
 const LANGUAGE = "es";
 const LEAVING_SOON_WINDOW_DAYS = 30;
 
@@ -80,7 +79,7 @@ async function postGraphQL<T>(operationName: string, query: string, variables: R
  * LEAVING_SOON_WINDOW_DAYS). This is the one feature TMDB's watch/providers
  * endpoint doesn't expose, so it goes straight to JustWatch's own (unofficial) API.
  */
-export async function getLeavingSoon(justWatchProviderIds: string[]): Promise<Title[]> {
+export async function getLeavingSoon(justWatchProviderIds: string[], country: string): Promise<Title[]> {
   if (justWatchProviderIds.length === 0) return [];
 
   const data = await postGraphQL<{ popularTitles: { edges: { node: JwNode }[] } }>(
@@ -92,7 +91,7 @@ export async function getLeavingSoon(justWatchProviderIds: string[]): Promise<Ti
         objectTypes: ["MOVIE", "SHOW"],
         includeTitlesWithoutUrl: true,
       },
-      country: COUNTRY,
+      country,
       language: LANGUAGE,
       first: 100,
       filter: { bestOnly: true },

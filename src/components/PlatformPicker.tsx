@@ -6,12 +6,13 @@ import type { Provider } from "@/lib/types";
 import { logoUrl } from "@/lib/images";
 
 type Props = {
+  country: string;
   initialSelected: Provider[];
   onSave: (selected: Provider[]) => void;
   saveLabel?: string;
 };
 
-export default function PlatformPicker({ initialSelected, onSave, saveLabel = "Guardar" }: Props) {
+export default function PlatformPicker({ country, initialSelected, onSave, saveLabel = "Guardar" }: Props) {
   const [available, setAvailable] = useState<Provider[] | null>(null);
   const [error, setError] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
@@ -19,14 +20,18 @@ export default function PlatformPicker({ initialSelected, onSave, saveLabel = "G
   );
 
   useEffect(() => {
-    fetch("/api/providers")
+    // Reset while refetching so a country switch doesn't briefly show the
+    // previous country's provider list as if it were still valid.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAvailable(null);
+    fetch(`/api/providers?country=${country}`)
       .then((res) => {
         if (!res.ok) throw new Error("bad response");
         return res.json();
       })
       .then((data) => setAvailable(data.providers))
       .catch(() => setError(true));
-  }, []);
+  }, [country]);
 
   const toggle = (id: number) => {
     setSelectedIds((prev) => {

@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     .split(",")
     .filter(Boolean)
     .map(Number);
+  const country = params.get("country");
   const type = (params.get("type") as MediaType | "all") ?? "all";
   const genreName = params.get("genre") ?? undefined;
   const maxRuntimeParam = params.get("maxRuntime");
@@ -16,12 +17,15 @@ export async function GET(request: NextRequest) {
   if (providerIds.length === 0) {
     return NextResponse.json({ results: [] });
   }
+  if (!country) {
+    return NextResponse.json({ error: "Falta el parámetro country" }, { status: 400 });
+  }
 
   try {
     const mediaTypes: MediaType[] = type === "all" ? ["movie", "tv"] : [type];
     const results = (
       await Promise.all(
-        mediaTypes.map((mediaType) => discoverTitles({ mediaType, providerIds, genreName, maxRuntime }))
+        mediaTypes.map((mediaType) => discoverTitles({ mediaType, region: country, providerIds, genreName, maxRuntime }))
       )
     ).flat();
 
