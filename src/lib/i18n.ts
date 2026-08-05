@@ -184,3 +184,8 @@ export function detectBrowserLocale(): Locale {
 export function parseLocale(value: string | null): Locale {
   return value === "en" ? "en" : "es";
 }
+
+/** Validates a country code is a 2-letter ISO 3166-1 alpha-2 string. */
+export function isValidCountry(value: string): boolean {
+  return /^[A-Z]{2}$/.test(value);
+}

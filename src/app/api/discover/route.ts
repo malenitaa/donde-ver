@@ -1,25 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { discoverTitles } from "@/lib/tmdb";
-import { parseLocale } from "@/lib/i18n";
+import { parseLocale, isValidCountry } from "@/lib/i18n";
 import type { MediaType } from "@/lib/types";
+
+const MAX_PROVIDERS = 10;
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const providerIds = (params.get("providers") ?? "")
     .split(",")
     .filter(Boolean)
-    .map(Number);
+    .map(Number)
+    .filter(Number.isFinite)
+    .slice(0, MAX_PROVIDERS);
   const country = params.get("country");
   const locale = parseLocale(params.get("locale"));
   const type = (params.get("type") as MediaType | "all") ?? "all";
   const genreName = params.get("genre") ?? undefined;
   const maxRuntimeParam = params.get("maxRuntime");
-  const maxRuntime = maxRuntimeParam ? Number(maxRuntimeParam) : undefined;
+  const maxRuntime = maxRuntimeParam && Number.isFinite(Number(maxRuntimeParam)) ? Number(maxRuntimeParam) : undefined;
 
   if (providerIds.length === 0) {
     return NextResponse.json({ results: [] });
   }
-  if (!country) {
+  if (!country || !isValidCountry(country)) {
     return NextResponse.json({ error: "Falta el parámetro country" }, { status: 400 });
   }
 
@@ -34,6 +38,7 @@ export async function GET(request: NextRequest) {
     results.sort(() => Math.random() - 0.5);
     return NextResponse.json({ results });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+    console.error("[api/discover]", err);
+    return NextResponse.json({ error: "No pudimos consultar TMDB." }, { status: 502 });
   }
 }
