@@ -1,8 +1,10 @@
+import "server-only";
 import { TMDB_LANGUAGE, type Locale } from "./i18n";
 import { findJustWatchId } from "./providers";
 import type { Country, Genre, MediaType, Provider, Title, TitleOffer } from "./types";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const REQUEST_TIMEOUT_MS = 8000;
 
 function apiKey(): string {
   const key = process.env.TMDB_API_KEY;
@@ -16,7 +18,7 @@ async function tmdbFetch<T>(path: string, language: string, params: Record<strin
   url.searchParams.set("language", language);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
-  const res = await fetch(url.toString(), { next: { revalidate: 60 * 60 } });
+  const res = await fetch(url.toString(), { next: { revalidate: 60 * 60 }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`TMDB respondió ${res.status} para ${path}`);
   }
@@ -65,9 +67,13 @@ export async function getCuratedProviders(region: string, locale: Locale): Promi
   ]);
 
   const byId = new Map<number, Provider>();
+  const unmatched = new Set<string>();
   for (const p of [...moviesList.results, ...tvList.results]) {
     const jwId = findJustWatchId(p.provider_name);
-    if (!jwId) continue;
+    if (!jwId) {
+      unmatched.add(p.provider_name);
+      continue;
+    }
     if (!byId.has(p.provider_id)) {
       byId.set(p.provider_id, {
         id: p.provider_id,
@@ -76,6 +82,13 @@ export async function getCuratedProviders(region: string, locale: Locale): Promi
         justWatchId: jwId,
       });
     }
+  }
+  if (unmatched.size > 0) {
+    // TMDB's provider_name for this region didn't match any entry in
+    // CURATED_PROVIDERS (see providers.ts) — surfaces here instead of
+    // silently dropping the platform, so a naming change on TMDB's end
+    // shows up in logs instead of as a user report of a missing platform.
+    console.warn(`[tmdb] Nombres de plataforma sin mapear en ${region}:`, [...unmatched]);
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -117,36 +130,56 @@ function offersFromProvidersResponse(regionResult: RegionResult | undefined): Ti
   return offers;
 }
 
-async function enrichWithDetails(mediaType: MediaType, id: number, region: string, locale: Locale): Promise<Title | null> {
+type TmdbDetails = Record<string, unknown>;
+
+function runtimeFromDetails(mediaType: MediaType, details: TmdbDetails): number | null {
+  return mediaType === "movie"
+    ? ((details.runtime as number) ?? null)
+    : (details.episode_run_time as number[])?.[0] ?? null;
+}
+
+function titleFromDetails(mediaType: MediaType, id: number, region: string, details: TmdbDetails, providers: TmdbProvidersResponse): Title {
+  const title = mediaType === "movie" ? (details.title as string) : (details.name as string);
+  const dateStr = mediaType === "movie" ? (details.release_date as string) : (details.first_air_date as string);
+  const genres = (details.genres as { id: number; name: string }[] | undefined)?.map((g) => g.name) ?? [];
+
+  return {
+    id,
+    mediaType,
+    title: title ?? "",
+    year: dateStr ? Number(dateStr.slice(0, 4)) : null,
+    posterPath: (details.poster_path as string) ?? null,
+    overview: (details.overview as string) ?? "",
+    runtime: runtimeFromDetails(mediaType, details),
+    genres,
+    offers: offersFromProvidersResponse(providers.results?.[region]),
+  };
+}
+
+async function fetchDetails(mediaType: MediaType, id: number, locale: Locale): Promise<{ id: number; details: TmdbDetails } | null> {
   try {
-    const language = TMDB_LANGUAGE[locale];
-    const [details, providers] = await Promise.all([
-      tmdbFetch<Record<string, unknown>>(`/${mediaType}/${id}`, language),
-      tmdbFetch<TmdbProvidersResponse>(`/${mediaType}/${id}/watch/providers`, language),
-    ]);
-
-    const title = mediaType === "movie" ? (details.title as string) : (details.name as string);
-    const dateStr = mediaType === "movie" ? (details.release_date as string) : (details.first_air_date as string);
-    const runtime =
-      mediaType === "movie"
-        ? ((details.runtime as number) ?? null)
-        : (details.episode_run_time as number[])?.[0] ?? null;
-    const genres = (details.genres as { id: number; name: string }[] | undefined)?.map((g) => g.name) ?? [];
-
-    return {
-      id,
-      mediaType,
-      title: title ?? "",
-      year: dateStr ? Number(dateStr.slice(0, 4)) : null,
-      posterPath: (details.poster_path as string) ?? null,
-      overview: (details.overview as string) ?? "",
-      runtime,
-      genres,
-      offers: offersFromProvidersResponse(providers.results?.[region]),
-    };
+    const details = await tmdbFetch<TmdbDetails>(`/${mediaType}/${id}`, TMDB_LANGUAGE[locale]);
+    return { id, details };
   } catch {
     return null;
   }
+}
+
+async function fetchProviders(mediaType: MediaType, id: number, locale: Locale): Promise<TmdbProvidersResponse | null> {
+  try {
+    return await tmdbFetch<TmdbProvidersResponse>(`/${mediaType}/${id}/watch/providers`, TMDB_LANGUAGE[locale]);
+  } catch {
+    return null;
+  }
+}
+
+async function enrichWithDetails(mediaType: MediaType, id: number, region: string, locale: Locale): Promise<Title | null> {
+  const [detailsResult, providers] = await Promise.all([
+    fetchDetails(mediaType, id, locale),
+    fetchProviders(mediaType, id, locale),
+  ]);
+  if (!detailsResult || !providers) return null;
+  return titleFromDetails(mediaType, id, region, detailsResult.details, providers);
 }
 
 export async function searchTitles(query: string, region: string, locale: Locale, limit = 20): Promise<Title[]> {
@@ -195,12 +228,31 @@ export async function discoverTitles(opts: {
   );
   const candidateIds = pages.flatMap((p) => p.results).map((r) => r.id);
 
-  const enriched = await Promise.all(candidateIds.map((id) => enrichWithDetails(opts.mediaType, id, opts.region, opts.locale)));
-  let results = enriched.filter((t): t is Title => t !== null);
-  if (opts.maxRuntime) {
-    results = results.filter((t) => t.runtime !== null && t.runtime <= opts.maxRuntime!);
+  if (!opts.maxRuntime) {
+    const enriched = await Promise.all(candidateIds.map((id) => enrichWithDetails(opts.mediaType, id, opts.region, opts.locale)));
+    return enriched.filter((t): t is Title => t !== null).slice(0, 20);
   }
-  return results.slice(0, 20);
+
+  // With a runtime filter on, over-fetching pages already means most
+  // candidates get thrown away — fetching `watch/providers` (a 2nd TMDB
+  // request) for every one of them regardless is wasted work. `details`
+  // alone already has the real runtime, so filter on that first and only
+  // fetch `watch/providers` for the candidates that actually survive.
+  const maxRuntime = opts.maxRuntime;
+  const detailsResults = await Promise.all(candidateIds.map((id) => fetchDetails(opts.mediaType, id, opts.locale)));
+  const survivors = detailsResults.filter((r): r is { id: number; details: TmdbDetails } => {
+    if (!r) return false;
+    const runtime = runtimeFromDetails(opts.mediaType, r.details);
+    return runtime !== null && runtime <= maxRuntime;
+  });
+
+  const withProviders = await Promise.all(
+    survivors.map(async (s) => {
+      const providers = await fetchProviders(opts.mediaType, s.id, opts.locale);
+      return providers ? titleFromDetails(opts.mediaType, s.id, opts.region, s.details, providers) : null;
+    })
+  );
+  return withProviders.filter((t): t is Title => t !== null).slice(0, 20);
 }
 
 export async function getTitleDetails(mediaType: MediaType, id: number, region: string, locale: Locale): Promise<Title | null> {

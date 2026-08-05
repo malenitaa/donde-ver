@@ -1,4 +1,27 @@
+import path from "node:path";
 import type { NextConfig } from "next";
+
+const securityHeaders = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
+  },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https://image.tmdb.org https://images.justwatch.com",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  },
+];
 
 const nextConfig: NextConfig = {
   images: {
@@ -6,6 +29,14 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "image.tmdb.org" },
       { protocol: "https", hostname: "images.justwatch.com" },
     ],
+  },
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
+  },
+  // A lockfile elsewhere on this machine (outside the project) makes
+  // Turbopack guess the workspace root wrong; pin it explicitly.
+  turbopack: {
+    root: path.join(__dirname),
   },
 };
 

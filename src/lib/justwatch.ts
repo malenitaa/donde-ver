@@ -1,3 +1,4 @@
+import "server-only";
 import { JUSTWATCH_LANGUAGE, type Locale } from "./i18n";
 import type { MediaType, Title } from "./types";
 
@@ -9,6 +10,9 @@ import type { MediaType, Title } from "./types";
 const JUSTWATCH_API = "https://apis.justwatch.com/graphql";
 const IMAGES_BASE = "https://images.justwatch.com";
 const LEAVING_SOON_WINDOW_DAYS = 30;
+// Per-request timeout: this is an unwatched, unofficial endpoint that can hang
+// without ever responding, so we can't rely on it to fail on its own.
+const REQUEST_TIMEOUT_MS = 8000;
 // Max items JustWatch will return per page for this query before erroring with
 // "page too large" — found by trial, not documented anywhere.
 const PAGE_SIZE = 100;
@@ -72,12 +76,19 @@ type JwNode = {
   offers: JwOffer[];
 };
 
-async function postGraphQL<T>(operationName: string, query: string, variables: Record<string, unknown>): Promise<T> {
+async function postGraphQL<T>(
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<T> {
+  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const res = await fetch(JUSTWATCH_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operationName, query, variables }),
     next: { revalidate: 60 * 60 },
+    signal: signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal,
   });
   if (!res.ok) throw new Error(`JustWatch respondió ${res.status}`);
   const json = await res.json();
@@ -85,7 +96,13 @@ async function postGraphQL<T>(operationName: string, query: string, variables: R
   return json.data as T;
 }
 
-async function fetchPopularPage(providerId: string, country: string, locale: Locale, offset: number): Promise<JwNode[]> {
+async function fetchPopularPage(
+  providerId: string,
+  country: string,
+  locale: Locale,
+  offset: number,
+  signal?: AbortSignal
+): Promise<JwNode[]> {
   const data = await postGraphQL<{ popularTitles: { edges: { node: JwNode }[] } }>(
     "GetPopularTitles",
     POPULAR_QUERY,
@@ -105,7 +122,8 @@ async function fetchPopularPage(providerId: string, country: string, locale: Loc
       first: PAGE_SIZE,
       offset,
       filter: { bestOnly: true },
-    }
+    },
+    signal
   );
   return data.popularTitles.edges.map((e) => e.node);
 }
@@ -121,13 +139,30 @@ async function fetchPopularPage(providerId: string, country: string, locale: Loc
  * quietly leaves a catalog — can still be missed. There's no dedicated "leaving
  * soon" endpoint on this unofficial API to fall back on.
  */
-export async function getLeavingSoon(justWatchProviderIds: string[], country: string, locale: Locale): Promise<Title[]> {
+export async function getLeavingSoon(
+  justWatchProviderIds: string[],
+  country: string,
+  locale: Locale,
+  signal?: AbortSignal
+): Promise<Title[]> {
   if (justWatchProviderIds.length === 0) return [];
 
   const pageRequests = justWatchProviderIds.flatMap((providerId) =>
-    Array.from({ length: PAGES_PER_PROVIDER }, (_, i) => fetchPopularPage(providerId, country, locale, i * PAGE_SIZE))
+    Array.from({ length: PAGES_PER_PROVIDER }, (_, i) =>
+      fetchPopularPage(providerId, country, locale, i * PAGE_SIZE, signal)
+    )
   );
-  const pages = await Promise.all(pageRequests);
+  // allSettled instead of all: with up to PAGES_PER_PROVIDER * providers.length
+  // requests in flight, a single page failing (timeout, rate limit, transient
+  // error) shouldn't discard every other page that succeeded.
+  const settled = await Promise.allSettled(pageRequests);
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  const pages = settled
+    .filter((r): r is PromiseFulfilledResult<JwNode[]> => r.status === "fulfilled")
+    .map((r) => r.value);
+  if (pages.length === 0 && pageRequests.length > 0) {
+    throw new Error("JustWatch no respondió ninguna de las páginas pedidas");
+  }
 
   const seen = new Set<string>();
   const nodes: JwNode[] = [];

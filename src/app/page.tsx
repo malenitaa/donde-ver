@@ -27,6 +27,7 @@ export default function Home() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<Title[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [retryKey, setRetryKey] = useState(0);
 
   const cache = useRef(new Map<string, Title[]>());
 
@@ -42,6 +43,9 @@ export default function Home() {
 
     const mode = filters.leavingSoon ? "leaving" : query ? "search" : "discover";
     const cacheKey = JSON.stringify({ mode, query, filters, providerIds, justWatchIds, countryCode, locale });
+    // A failed request is never written to `cache` below (only the success
+    // path does), so bumping `retryKey` to force this effect to re-run always
+    // reaches the fetch again instead of replaying a stale cached result.
     const cached = cache.current.get(cacheKey);
     if (cached) {
       setResults(cached);
@@ -101,7 +105,7 @@ export default function Home() {
 
     run();
     return () => controller.abort();
-  }, [query, filters, platforms, platformsLoaded, countryLoaded, countryCode, providerIds, justWatchIds, locale]);
+  }, [query, filters, platforms, platformsLoaded, countryLoaded, countryCode, providerIds, justWatchIds, locale, retryKey]);
 
   if (!platformsLoaded || !countryLoaded) return null;
 
@@ -130,7 +134,21 @@ export default function Home() {
 
         {status === "loading" && <p className="py-10 text-center text-sm text-neutral-500">{t.loading}</p>}
 
-        {status === "error" && <EmptyState title={t.errorTitle} description={t.errorDescription} />}
+        {status === "error" && (
+          <EmptyState
+            title={t.errorTitle}
+            description={t.errorDescription}
+            action={
+              <button
+                type="button"
+                onClick={() => setRetryKey((k) => k + 1)}
+                className="mt-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-neutral-950"
+              >
+                {t.retry}
+              </button>
+            }
+          />
+        )}
 
         {status === "ready" && results.length === 0 && (
           <EmptyState

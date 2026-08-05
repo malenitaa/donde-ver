@@ -81,6 +81,7 @@ export const STRINGS = {
     loading: "Buscando…",
     errorTitle: "No pudimos conectar con el servicio",
     errorDescription: "TMDB o JustWatch no respondieron. Probá de nuevo en unos segundos.",
+    retry: "Reintentar",
     noResultsLeaving: "Nada por irse de tus plataformas por ahora",
     noResultsGeneric: "Sin resultados",
     noResultsQuery: (q: string) => `No encontramos "${q}".`,
@@ -131,6 +132,7 @@ export const STRINGS = {
     loading: "Searching…",
     errorTitle: "We couldn't reach the service",
     errorDescription: "TMDB or JustWatch didn't respond. Try again in a few seconds.",
+    retry: "Retry",
     noResultsLeaving: "Nothing leaving your platforms right now",
     noResultsGeneric: "No results",
     noResultsQuery: (q: string) => `We couldn't find "${q}".`,
@@ -161,6 +163,15 @@ export const STRINGS = {
     countriesError: "We couldn't load the country list.",
   },
 } satisfies Record<Locale, Record<string, unknown>>;
+
+// Compile-time guard: every locale must expose exactly the same keys, so a
+// key added to one dictionary and forgotten in the other fails the build
+// instead of silently rendering blank text at runtime (STRINGS[locale] has
+// no other check tying `en` and `es` together — `satisfies` above only
+// checks each locale's shape against `Record<string, unknown>` on its own).
+type AssertSameKeys<A, B> = keyof A extends keyof B ? (keyof B extends keyof A ? true : never) : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _localeKeysMatch: AssertSameKeys<(typeof STRINGS)["es"], (typeof STRINGS)["en"]> = true;
 
 /** Suggests a locale from the browser's own language setting — a device
  * preference, not IP/geolocation. Always overridable via the language toggle. */

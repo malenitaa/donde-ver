@@ -17,9 +17,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await getLeavingSoon(providers, country, locale);
+    const results = await getLeavingSoon(providers, country, locale, request.signal);
     return NextResponse.json({ results });
   } catch (err) {
+    if ((err as Error).name === "AbortError") return new NextResponse(null, { status: 499 });
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 }
