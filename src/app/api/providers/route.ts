@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CACHE_DAY } from "@/lib/cacheHeaders";
 import { getCuratedProviders } from "@/lib/tmdb";
 import { parseLocale, isValidCountry } from "@/lib/i18n";
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const providers = await getCuratedProviders(country, locale);
-    return NextResponse.json({ providers });
+    return NextResponse.json({ providers }, { headers: CACHE_DAY });
   } catch (err) {
     console.error("[api/providers]", err);
     return NextResponse.json({ error: "No pudimos consultar TMDB." }, { status: 502 });

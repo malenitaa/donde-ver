@@ -72,3 +72,22 @@ describe("/api/leaving-soon", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("CDN caching", () => {
+  it("lets the CDN cache successful answers", async () => {
+    const res = await leavingSoon(req("/api/leaving-soon?providers=nfx&country=AR&locale=es"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toContain("s-maxage=3600");
+  });
+
+  it("doesn't cache errors", async () => {
+    const bad = await leavingSoon(req("/api/leaving-soon?providers=nfx"));
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get("cache-control") ?? "").not.toContain("s-maxage");
+
+    fetchMock.mockImplementation(async () => new Response("nope", { status: 500 }));
+    const upstreamDown = await discover(req("/api/discover?providers=8&country=AR&locale=es&type=movie"));
+    expect(upstreamDown.status).toBe(502);
+    expect(upstreamDown.headers.get("cache-control") ?? "").not.toContain("s-maxage");
+  });
+});

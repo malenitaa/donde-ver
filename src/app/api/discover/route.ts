@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CACHE_HOUR } from "@/lib/cacheHeaders";
 import { discoverTitles } from "@/lib/tmdb";
 import { parseLocale, isValidCountry, RUNTIME_OPTIONS } from "@/lib/i18n";
 import type { MediaType } from "@/lib/types";
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     ).flat();
 
     results.sort(() => Math.random() - 0.5);
-    return NextResponse.json({ results });
+    return NextResponse.json({ results }, { headers: CACHE_HOUR });
   } catch (err) {
     console.error("[api/discover]", err);
     return NextResponse.json({ error: "No pudimos consultar TMDB." }, { status: 502 });
