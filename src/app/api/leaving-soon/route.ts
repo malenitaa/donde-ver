@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CACHE_HOUR } from "@/lib/cacheHeaders";
 import { getLeavingSoon } from "@/lib/justwatch";
 import { parseLocale, isValidCountry } from "@/lib/i18n";
 import { CURATED_PROVIDERS } from "@/lib/providers";
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { titles, providersWithoutDates } = await getLeavingSoon(providers, country, locale, request.signal);
-    return NextResponse.json({ results: titles, providersWithoutDates });
+    return NextResponse.json({ results: titles, providersWithoutDates }, { headers: CACHE_HOUR });
   } catch (err) {
     if ((err as Error).name === "AbortError") return new NextResponse(null, { status: 499 });
     console.error("[api/leaving-soon]", err);
