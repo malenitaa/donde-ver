@@ -113,6 +113,8 @@ export const STRINGS = {
     providersError: "No pudimos cargar la lista de plataformas. Revisá tu conexión o intentá de nuevo más tarde.",
     loadingCountries: "Cargando países…",
     countriesError: "No pudimos cargar la lista de países.",
+    attributionTmdb: "Este sitio usa TMDB y las APIs de TMDB, pero TMDB no lo avala, certifica ni aprueba.",
+    attributionJustWatch: "Datos de disponibilidad:",
   },
   en: {
     appName: "Where to watch",
@@ -167,6 +169,8 @@ export const STRINGS = {
     providersError: "We couldn't load the platform list. Check your connection or try again later.",
     loadingCountries: "Loading countries…",
     countriesError: "We couldn't load the country list.",
+    attributionTmdb: "This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.",
+    attributionJustWatch: "Availability data:",
   },
 } satisfies Record<Locale, Record<string, unknown>>;
 
