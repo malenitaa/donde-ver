@@ -26,8 +26,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "image.tmdb.org" },
-      { protocol: "https", hostname: "images.justwatch.com" },
+      // Only the sizes src/lib/images.ts asks for: an open pattern lets anyone
+      // make the optimizer transform any TMDB image (e.g. /t/p/original) at any width.
+      { protocol: "https", hostname: "image.tmdb.org", pathname: "/t/p/w92/**" },
+      { protocol: "https", hostname: "image.tmdb.org", pathname: "/t/p/w342/**" },
+      { protocol: "https", hostname: "image.tmdb.org", pathname: "/t/p/w500/**" },
+      { protocol: "https", hostname: "images.justwatch.com", pathname: "/poster/**" },
     ],
   },
   async headers() {
