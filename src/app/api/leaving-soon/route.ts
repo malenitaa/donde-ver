@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CACHE_HOUR } from "@/lib/cacheHeaders";
 import { getLeavingSoon } from "@/lib/justwatch";
 import { parseLocale, isValidCountry } from "@/lib/i18n";
+import { CURATED_PROVIDERS } from "@/lib/providers";
 
 const MAX_PROVIDERS = 10;
+// Each provider costs PAGES_PER_PROVIDER requests to JustWatch, so only the
+// ones the app offers are accepted, once each.
+const KNOWN_PROVIDERS = new Set(CURATED_PROVIDERS.map((p) => p.justWatchId));
 
 export async function GET(request: NextRequest) {
-  const providers = (request.nextUrl.searchParams.get("providers") ?? "")
-    .split(",")
-    .filter(Boolean)
-    .slice(0, MAX_PROVIDERS);
+  const providers = [
+    ...new Set((request.nextUrl.searchParams.get("providers") ?? "").split(",").filter((p) => KNOWN_PROVIDERS.has(p))),
+  ].slice(0, MAX_PROVIDERS);
   const country = request.nextUrl.searchParams.get("country");
   const locale = parseLocale(request.nextUrl.searchParams.get("locale"));
 
@@ -20,8 +24,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await getLeavingSoon(providers, country, locale, request.signal);
-    return NextResponse.json({ results });
+    const { titles, providersWithoutDates } = await getLeavingSoon(providers, country, locale, request.signal);
+    return NextResponse.json({ results: titles, providersWithoutDates }, { headers: CACHE_HOUR });
   } catch (err) {
     if ((err as Error).name === "AbortError") return new NextResponse(null, { status: 499 });
     console.error("[api/leaving-soon]", err);

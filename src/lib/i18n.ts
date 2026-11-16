@@ -83,6 +83,9 @@ export const STRINGS = {
     errorDescription: "TMDB o JustWatch no respondieron. Probá de nuevo en unos segundos.",
     retry: "Reintentar",
     noResultsLeaving: "Nada por irse de tus plataformas por ahora",
+    leavingNoDatesTitle: "No sabemos qué se va de tus plataformas",
+    leavingNoDates: (names: string) =>
+      `JustWatch no publica cuándo se van los títulos de ${names} en este país, así que ahí no te podemos avisar.`,
     noResultsGeneric: "Sin resultados",
     noResultsQuery: (q: string) => `No encontramos "${q}".`,
     tryAdjustFilters: "Probá ajustar los filtros.",
@@ -110,6 +113,8 @@ export const STRINGS = {
     providersError: "No pudimos cargar la lista de plataformas. Revisá tu conexión o intentá de nuevo más tarde.",
     loadingCountries: "Cargando países…",
     countriesError: "No pudimos cargar la lista de países.",
+    attributionTmdb: "Este sitio usa TMDB y las APIs de TMDB, pero TMDB no lo avala, certifica ni aprueba.",
+    attributionJustWatch: "Datos de disponibilidad:",
   },
   en: {
     appName: "Where to watch",
@@ -134,6 +139,9 @@ export const STRINGS = {
     errorDescription: "TMDB or JustWatch didn't respond. Try again in a few seconds.",
     retry: "Retry",
     noResultsLeaving: "Nothing leaving your platforms right now",
+    leavingNoDatesTitle: "We can't tell what's leaving your platforms",
+    leavingNoDates: (names: string) =>
+      `JustWatch doesn't publish when titles leave ${names} in this country, so we can't warn you about those.`,
     noResultsGeneric: "No results",
     noResultsQuery: (q: string) => `We couldn't find "${q}".`,
     tryAdjustFilters: "Try adjusting the filters.",
@@ -161,6 +169,8 @@ export const STRINGS = {
     providersError: "We couldn't load the platform list. Check your connection or try again later.",
     loadingCountries: "Loading countries…",
     countriesError: "We couldn't load the country list.",
+    attributionTmdb: "This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.",
+    attributionJustWatch: "Availability data:",
   },
 } satisfies Record<Locale, Record<string, unknown>>;
 

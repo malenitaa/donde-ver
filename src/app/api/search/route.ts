@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CACHE_HOUR } from "@/lib/cacheHeaders";
 import { searchTitles } from "@/lib/tmdb";
 import { parseLocale, isValidCountry } from "@/lib/i18n";
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const results = await searchTitles(query, country, locale);
-    return NextResponse.json({ results });
+    return NextResponse.json({ results }, { headers: CACHE_HOUR });
   } catch (err) {
     console.error("[api/search]", err);
     return NextResponse.json({ error: "No pudimos consultar TMDB." }, { status: 502 });

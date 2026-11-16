@@ -26,10 +26,12 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<Title[]>([]);
+  // JustWatch ids of the user's platforms that JustWatch has no expiry dates for.
+  const [withoutDates, setWithoutDates] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [retryKey, setRetryKey] = useState(0);
 
-  const cache = useRef(new Map<string, Title[]>());
+  const cache = useRef(new Map<string, { titles: Title[]; withoutDates: string[] }>());
 
   const providerIds = useMemo(() => (platforms ?? []).map((p) => p.id), [platforms]);
   const justWatchIds = useMemo(
@@ -48,7 +50,8 @@ export default function Home() {
     // reaches the fetch again instead of replaying a stale cached result.
     const cached = cache.current.get(cacheKey);
     if (cached) {
-      setResults(cached);
+      setResults(cached.titles);
+      setWithoutDates(cached.withoutDates);
       setStatus("ready");
       return;
     }
@@ -59,13 +62,16 @@ export default function Home() {
     const run = async () => {
       try {
         let data: Title[];
+        let noDates: string[] = [];
         if (mode === "leaving") {
           const res = await fetch(
             `/api/leaving-soon?providers=${justWatchIds.join(",")}&country=${countryCode}&locale=${locale}`,
             { signal: controller.signal }
           );
           if (!res.ok) throw new Error("leaving-soon failed");
-          data = (await res.json()).results;
+          const body = await res.json();
+          data = body.results;
+          noDates = body.providersWithoutDates ?? [];
           if (query) data = data.filter((t) => t.title.toLowerCase().includes(query.toLowerCase()));
         } else if (mode === "search") {
           const res = await fetch(
@@ -95,8 +101,9 @@ export default function Home() {
           }
         }
 
-        cache.current.set(cacheKey, data);
+        cache.current.set(cacheKey, { titles: data, withoutDates: noDates });
         setResults(data);
+        setWithoutDates(noDates);
         setStatus("ready");
       } catch (err) {
         if ((err as Error).name !== "AbortError") setStatus("error");
@@ -122,6 +129,10 @@ export default function Home() {
 
   const matched = results.filter((t) => t.offers.some((o) => providerIds.includes(o.providerId) || o.providerId === 0));
   const showUnmatched = query && !filters.leavingSoon && matched.length === 0 && results.length > 0;
+  const platformsWithoutDates = filters.leavingSoon
+    ? platforms.filter((p) => p.justWatchId && withoutDates.includes(p.justWatchId)).map((p) => p.name)
+    : [];
+  const noPlatformHasDates = platformsWithoutDates.length > 0 && platformsWithoutDates.length === justWatchIds.length;
 
   return (
     <>
@@ -150,10 +161,24 @@ export default function Home() {
           />
         )}
 
+        {status === "ready" && platformsWithoutDates.length > 0 && !(results.length === 0 && noPlatformHasDates) && (
+          <p role="status" className="mb-4 rounded-lg border border-neutral-800 px-4 py-3 text-sm text-neutral-400">
+            {t.leavingNoDates(platformsWithoutDates.join(", "))}
+          </p>
+        )}
+
         {status === "ready" && results.length === 0 && (
           <EmptyState
-            title={filters.leavingSoon ? t.noResultsLeaving : t.noResultsGeneric}
-            description={query ? t.noResultsQuery(query) : t.tryAdjustFilters}
+            title={
+              filters.leavingSoon ? (noPlatformHasDates ? t.leavingNoDatesTitle : t.noResultsLeaving) : t.noResultsGeneric
+            }
+            description={
+              noPlatformHasDates
+                ? t.leavingNoDates(platformsWithoutDates.join(", "))
+                : query
+                  ? t.noResultsQuery(query)
+                  : t.tryAdjustFilters
+            }
           />
         )}
 

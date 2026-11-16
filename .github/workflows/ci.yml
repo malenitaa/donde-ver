@@ -20,8 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      # --if-present: los tests llegan con el PR del issue #1.
-      - run: npm test --if-present
+      - run: npm test
       - run: npm run build
       # Vulnerabilidades conocidas en lo que llega a producción.
       - run: npm audit --omit=dev --audit-level=high
