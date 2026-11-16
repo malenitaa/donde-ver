@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7 # una versión nueva espera una semana antes de la PR
+    groups:
+      menores:
+        update-types: ["minor", "patch"] # una sola PR semanal para lo chico
+    ignore:
+      # @types/node sigue a la versión de Node donde corre el sitio; el major
+      # se sube a mano cuando cambia el runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
