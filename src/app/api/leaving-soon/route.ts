@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await getLeavingSoon(providers, country, locale, request.signal);
-    return NextResponse.json({ results });
+    const { titles, providersWithoutDates } = await getLeavingSoon(providers, country, locale, request.signal);
+    return NextResponse.json({ results: titles, providersWithoutDates });
   } catch (err) {
     if ((err as Error).name === "AbortError") return new NextResponse(null, { status: 499 });
     console.error("[api/leaving-soon]", err);

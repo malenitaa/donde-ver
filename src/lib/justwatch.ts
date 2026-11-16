@@ -138,14 +138,19 @@ async function fetchPopularPage(
  * far enough down — an old, obscure title is exactly the kind of thing that
  * quietly leaves a catalog — can still be missed. There's no dedicated "leaving
  * soon" endpoint on this unofficial API to fall back on.
+ *
+ * `providersWithoutDates` lists the requested providers that answered but had
+ * no expiry date (`availableTo`) on any of their offers. JustWatch doesn't
+ * publish those dates for some services in some countries (e.g. Netflix in
+ * AR), and an empty list there means "we can't tell", not "nothing is leaving".
  */
 export async function getLeavingSoon(
   justWatchProviderIds: string[],
   country: string,
   locale: Locale,
   signal?: AbortSignal
-): Promise<Title[]> {
-  if (justWatchProviderIds.length === 0) return [];
+): Promise<{ titles: Title[]; providersWithoutDates: string[] }> {
+  if (justWatchProviderIds.length === 0) return { titles: [], providersWithoutDates: [] };
 
   const pageRequests = justWatchProviderIds.flatMap((providerId) =>
     Array.from({ length: PAGES_PER_PROVIDER }, (_, i) =>
@@ -163,6 +168,17 @@ export async function getLeavingSoon(
   if (pages.length === 0 && pageRequests.length > 0) {
     throw new Error("JustWatch no respondió ninguna de las páginas pedidas");
   }
+
+  // pageRequests is built provider by provider, PAGES_PER_PROVIDER at a time,
+  // so a page's index tells which provider it belongs to. Only providers with
+  // at least one page that answered can be judged as having no dates.
+  const answered = new Set(
+    settled.flatMap((r, i) => (r.status === "fulfilled" ? [justWatchProviderIds[Math.floor(i / PAGES_PER_PROVIDER)]] : []))
+  );
+  const withDates = new Set(
+    pages.flat().flatMap((node) => node.offers.filter((o) => o.availableTo).map((o) => o.package.shortName))
+  );
+  const providersWithoutDates = justWatchProviderIds.filter((id) => answered.has(id) && !withDates.has(id));
 
   const seen = new Set<string>();
   const nodes: JwNode[] = [];
@@ -211,5 +227,5 @@ export async function getLeavingSoon(
   }
 
   titles.sort((a, b) => new Date(a.leavingAt!).getTime() - new Date(b.leavingAt!).getTime());
-  return titles;
+  return { titles, providersWithoutDates };
 }
