@@ -14,6 +14,18 @@ updates:
       # se sube a mano cuando cambia el runtime.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Vitest 5 pide @types/node 22 o ≥24: con ^20, npm no lo resuelve.
+      # Sacarlo cuando se suba @types/node.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      # eslint-config-next trae eslint-plugin-import, -jsx-a11y y -react, que
+      # declaran soporte hasta ESLint 9. Sacarlo cuando acepten el 10.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint (viene con eslint-config-next) no corre con
+      # TypeScript 7 y el lint se rompe. Sacarlo cuando lo soporte.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
